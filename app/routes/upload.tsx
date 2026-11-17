@@ -20,6 +20,7 @@ const Upload = () => {
         setFile(selectedFile);
     };
 
+    
     const handleAnalyze = async ({
         companyName,
         jobTitle,
