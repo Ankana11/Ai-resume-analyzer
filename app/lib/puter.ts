@@ -327,32 +327,37 @@ export const usePuterStore = create<PuterStore>((set, get) => {
         >;
     };
 
-    const feedback = async (path: string, message: string) => {
-        const puter = getPuter();
-        if (!puter) {
-            setError("Puter.js not available");
-            return;
-        }
+   
+const feedback = async (path: string, message: string) => {
+    const puter = getPuter();
 
-        return puter.ai.chat(
-            [
-                {
-                    role: "user",
-                    content: [
-                        {
-                            type: "file",
-                            puter_path: path,
-                        },
-                        {
-                            type: "text",
-                            text: message,
-                        },
-                    ],
-                },
-            ],
-            { model: "claude-3-7-sonnet" }
-        ) as Promise<AIResponse | undefined>;
-    };
+    if (!puter) {
+        setError("Puter.js not available");
+        return;
+    }
+
+    return puter.ai.chat(
+        [
+            {
+                role: "user",
+                content: [
+                    {
+                        type: "file",
+                        puter_path: path,
+                    },
+                    {
+                        type: "text",
+                        text: message,
+                    },
+                ],
+            },
+        ],
+        {
+            model: "claude-sonnet-4-6",
+        }
+    ) as Promise<AIResponse | undefined>;
+};
+
 
     const img2txt = async (image: string | File | Blob, testMode?: boolean) => {
         const puter = getPuter();

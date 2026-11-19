@@ -1,3 +1,6 @@
+
+import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
 export interface PdfConversionResult {
     imageUrl: string;
     file: File | null;
@@ -5,22 +8,23 @@ export interface PdfConversionResult {
 }
 
 let pdfjsLib: any = null;
-let isLoading = false;
 let loadPromise: Promise<any> | null = null;
 
 async function loadPdfJs(): Promise<any> {
     if (pdfjsLib) return pdfjsLib;
+
     if (loadPromise) return loadPromise;
 
-    isLoading = true;
-    // @ts-expect-error - pdfjs-dist/build/pdf.mjs is not a module
-    loadPromise = import("pdfjs-dist/build/pdf.mjs").then((lib) => {
-        // Set the worker source to use local file
-        lib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        pdfjsLib = lib;
-        isLoading = false;
-        return lib;
-    });
+    loadPromise = import("pdfjs-dist/build/pdf.mjs")
+        .then((lib) => {
+            lib.GlobalWorkerOptions.workerSrc = pdfWorker;
+            pdfjsLib = lib;
+            return lib;
+        })
+        .catch((error) => {
+            loadPromise = null;
+            throw error;
+        });
 
     return loadPromise;
 }
@@ -32,32 +36,44 @@ export async function convertPdfToImage(
         const lib = await loadPdfJs();
 
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await lib.getDocument({ data: arrayBuffer }).promise;
+
+        const pdf = await lib.getDocument({
+            data: arrayBuffer
+        }).promise;
+
         const page = await pdf.getPage(1);
 
         const viewport = page.getViewport({ scale: 4 });
+
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
+
+        if (!context) {
+            throw new Error("Failed to create canvas context");
+        }
 
         canvas.width = viewport.width;
         canvas.height = viewport.height;
 
-        if (context) {
-            context.imageSmoothingEnabled = true;
-            context.imageSmoothingQuality = "high";
-        }
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
 
-        await page.render({ canvasContext: context!, viewport }).promise;
+        await page.render({
+            canvasContext: context,
+            viewport
+        }).promise;
 
         return new Promise((resolve) => {
             canvas.toBlob(
                 (blob) => {
                     if (blob) {
-                        // Create a File from the blob with the same name as the pdf
                         const originalName = file.name.replace(/\.pdf$/i, "");
-                        const imageFile = new File([blob], `${originalName}.png`, {
-                            type: "image/png",
-                        });
+
+                        const imageFile = new File(
+                            [blob],
+                            `${originalName}.png`,
+                            { type: "image/png" }
+                        );
 
                         resolve({
                             imageUrl: URL.createObjectURL(blob),
@@ -73,9 +89,12 @@ export async function convertPdfToImage(
                 },
                 "image/png",
                 1.0
-            ); // Set quality to maximum (1.0)
+            );
         });
+
     } catch (err) {
+        console.error("PDF conversion error:", err);
+
         return {
             imageUrl: "",
             file: null,
